@@ -3,79 +3,39 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>今日の極秘任務サーバー</title>
+  <title>今日の極秘任務</title>
   <style>
-    body { font-family: system-ui,-apple-system,BlinkMacSystemFont; margin:0; background:#f6f7f8; }
-    .wrap { max-width:720px; margin:0 auto; padding:18px 14px 22px; }
-    .title { font-weight:800; font-size:1.05rem; margin:6px 4px 12px; opacity:.85; }
-    .panel { background:#fff; border:1px solid #e6e7ea; border-radius:16px; overflow:hidden; }
-    .chat { padding:14px; min-height:46vh; max-height:62vh; overflow:auto; background:linear-gradient(#fff,#fff); }
-    .row { display:flex; margin:10px 0; }
-    .row.me { justify-content:flex-end; }
-    .row.bot { justify-content:flex-start; }
-    .bubble {
-      max-width:86%;
-      padding:10px 12px;
-      border-radius:14px;
-      line-height:1.45;
-      white-space:pre-wrap;
-      word-break:break-word;
-      border:1px solid #e7e7ea;
-      background:#fff;
-    }
-    .row.me .bubble { background:#e9f5ff; border-color:#d7ecff; }
-    .meta { font-size:.85rem; opacity:.65; margin-top:6px; }
-    .composer {
-      display:flex; gap:10px; padding:12px;
-      border-top:1px solid #eee; background:#fff;
-    }
-    .input {
-      flex:1; border:1px solid #e2e3e7; border-radius:14px;
-      padding:12px 12px; font-size:1rem; outline:none;
-      background:#fafafa;
-    }
+    body { font-family: system-ui,-apple-system,BlinkMacSystemFont; padding:24px; text-align:center; }
+    .q { font-size:1.1rem; opacity:.85; margin-bottom:14px; }
     .btn {
-      border:1px solid #d9dadd; background:#fff; border-radius:14px;
-      padding:12px 14px; font-size:1rem; cursor:pointer;
+      font-size:1.1rem; padding:12px 16px; border-radius:12px;
+      border:1px solid #ccc; background:#fff; cursor:pointer;
     }
     .btn:disabled { opacity:.6; cursor:default; }
-    .hint { font-size:.85rem; opacity:.65; margin:10px 6px 0; }
-    .smallbtn { font-size:.85rem; padding:8px 10px; border-radius:12px; }
-    .toolbar { display:flex; gap:10px; padding:0 6px; margin-top:10px; }
+    .a { margin-top:18px; font-size:1.6rem; font-weight:700; line-height:1.4; white-space:pre-wrap; }
+    .meta { margin-top:14px; font-size:.9rem; opacity:.6; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="title">任務チェック（JST 11:00で切替）</div>
+  <div class="q">ボタンを押すと、今日のUR★極秘任務のサーバーを表示します。</div>
 
-    <div class="panel">
-      <div class="chat" id="chat"></div>
+  <button class="btn" id="btn">今日のUR★サーバーは？</button>
 
-      <div class="composer">
-        <input class="input" id="input" value="今日の任務は？" />
-        <button class="btn" id="send">送信</button>
-      </div>
-    </div>
-
-    <div class="toolbar">
-      <button class="btn smallbtn" id="quick">「今日の任務は？」を送る</button>
-      <button class="btn smallbtn" id="clear">キャッシュ削除</button>
-    </div>
-    <div class="hint" id="status"></div>
-  </div>
+  <div class="a" id="answer" style="display:none;"></div>
+  <div class="meta" id="meta" style="display:none;"></div>
 
 <script>
-  // ▼ここだけ差し替え（Googleシート「ウェブに公開」のCSV URL）
-  const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQEEIV5e8bKRn52JeHNXySH4aZcce39QM-GY7lD6eh--_tZ5M1JZomfcWeOhzacscWyHEHDC7YC6MFO/pubhtml";
+  // ▼ここだけ差し替え（Googleシートを「ウェブに公開」で出たCSV URL）
+  const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQEEIV5e8bKRn52JeHNXySH4aZcce39QM-GY7lD6eh--_tZ5M1JZomfcWeOhzacscWyHEHDC7YC6MFO/pub?output=csv";
 
-  // ===== 時刻関連（JSTはUTC+9固定） =====
-  function nowJSTDate() {
+  // JST（UTC+9固定）
+  function nowJST() {
     return new Date(Date.now() + 9 * 60 * 60 * 1000);
   }
 
-  // 任務日キー：JST 11:00より前は前日扱い
+  // JST 11:00で任務日切替（11:00前は前日扱い）
   function missionDateKey() {
-    const jst = nowJSTDate();
+    const jst = nowJST();
     const y = jst.getUTCFullYear();
     const m = jst.getUTCMonth();
     const d = jst.getUTCDate();
@@ -90,45 +50,13 @@
     return `${yy}-${mm}-${dd}`;
   }
 
-  // 次の切替時刻（JST 11:00）の epoch(ms)
-  function nextSwitchEpochMs() {
-    // JST相当のnowを作って、今日の11:00JSTのepochを求める
-    // nowJSTDateは「JST相当をUTCとして持ってる」ので getUTC* で扱う
-    const jst = nowJSTDate();
-    const y = jst.getUTCFullYear();
-    const m = jst.getUTCMonth();
-    const d = jst.getUTCDate();
-    const h = jst.getUTCHours();
-
-    // 今日の11:00JST（= nowJSTDateのUTCで11:00）
-    let next = Date.UTC(y, m, d, 11, 0, 0);
-
-    // すでに11:00を過ぎていれば翌日の11:00
-    if (h >= 11) next = Date.UTC(y, m, d + 1, 11, 0, 0);
-
-    // nextは「JST相当をUTCとして扱った値」なので、実際のepochへ戻すには -9h
-    return next - 9 * 60 * 60 * 1000;
-  }
-
-  function fmtRemaining(ms) {
-    if (ms < 0) ms = 0;
-    const totalSec = Math.floor(ms / 1000);
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
-    if (h > 0) return `${h}時間${m}分`;
-    if (m > 0) return `${m}分${s}秒`;
-    return `${s}秒`;
-  }
-
-  // 3パターン日替わり（任務日を日数にして mod 3）
+  // 3パターン日替わり
   function dailyIndex3(dateKey) {
     const [y, m, d] = dateKey.split("-").map(Number);
     const dayNumber = Date.UTC(y, m - 1, d) / 86400000;
-    return ((dayNumber % 3) + 3) % 3; // 0..2
+    return ((dayNumber % 3) + 3) % 3;
   }
 
-  // ===== CSVパース（簡易） =====
   function parseCSV(text) {
     const lines = text.trim().split(/\r?\n/);
     return lines.map(line => {
@@ -148,65 +76,15 @@
     });
   }
 
-  // ===== チャットUI =====
-  const chat = document.getElementById("chat");
-  const input = document.getElementById("input");
-  const sendBtn = document.getElementById("send");
-  const quickBtn = document.getElementById("quick");
-  const clearBtn = document.getElementById("clear");
-  const statusEl = document.getElementById("status");
-
-  function appendBubble(who, text, metaText) {
-    const row = document.createElement("div");
-    row.className = "row " + (who === "me" ? "me" : "bot");
-
-    const bubble = document.createElement("div");
-    bubble.className = "bubble";
-    bubble.textContent = text;
-
-    if (metaText) {
-      const meta = document.createElement("div");
-      meta.className = "meta";
-      meta.textContent = metaText;
-      bubble.appendChild(meta);
-    }
-
-    row.appendChild(bubble);
-    chat.appendChild(row);
-    chat.scrollTop = chat.scrollHeight;
-  }
-
-  function setStatus() {
-    const remain = fmtRemaining(nextSwitchEpochMs() - Date.now());
-    statusEl.textContent = `次の切替（JST 11:00）まで：${remain}`;
-  }
-
-  // ===== キャッシュ =====
-  // 同じ任務日なら即表示。任務日が変わったら自動で取り直す。
-  const CACHE_KEY = "mission_cache_v1";
-  function loadCache() {
-    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); }
-    catch { return null; }
-  }
-  function saveCache(obj) {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(obj));
-  }
-  function clearCache() {
-    localStorage.removeItem(CACHE_KEY);
-  }
-
-  // ===== 任務取得 =====
-  async function fetchMissionFromSheet() {
+  async function fetchMission() {
     const dateKey = missionDateKey();
     const idx = dailyIndex3(dateKey);
 
     const res = await fetch(SHEET_CSV_URL, { cache: "no-store" });
-    if (!res.ok) throw new Error("Sheet fetch failed（公開URL/公開設定を確認）");
-
+    if (!res.ok) throw new Error("Sheet fetch failed");
     const csv = await res.text();
     const rows = parseCSV(csv);
 
-    // header: id,text を想定。id=0/1/2のtextを拾う
     const map = new Map();
     for (let i=1; i<rows.length; i++) {
       const [id, text] = rows[i];
@@ -214,80 +92,38 @@
       map.set(String(id).trim(), text);
     }
 
-    const text = map.get(String(idx)) ?? "（任務が未設定です：id 0/1/2 を確認）";
-    return { dateKey, idx, text, fetchedAt: Date.now() };
+    return {
+      dateKey,
+      idx,
+      text: map.get(String(idx)) ?? "（任務が未設定です：id 0/1/2 を確認）"
+    };
   }
 
-  async function getMission() {
-    const dateKey = missionDateKey();
-    const cached = loadCache();
+  const btn = document.getElementById("btn");
+  const answerEl = document.getElementById("answer");
+  const metaEl = document.getElementById("meta");
 
-    // キャッシュが同じ任務日なら即返す（通信なし）
-    if (cached && cached.dateKey === dateKey && typeof cached.text === "string") {
-      return { ...cached, fromCache: true };
-    }
-
-    const fresh = await fetchMissionFromSheet();
-    saveCache(fresh);
-    return { ...fresh, fromCache: false };
-  }
-
-  // ===== 送信処理（チャット演出） =====
-  async function handleSend(text) {
-    const trimmed = (text || "").trim();
-    if (!trimmed) return;
-
-    appendBubble("me", trimmed);
-    input.value = "";
-    sendBtn.disabled = true;
-    quickBtn.disabled = true;
-
-    // “考え中…” 演出
-    const thinkingId = "thinking_" + Math.random().toString(16).slice(2);
-    appendBubble("bot", "確認中…");
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "確認中…";
 
     try {
-      const m = await getMission();
-
-      // 直近の「確認中…」を差し替えたいが簡潔に：追加で出す
-      const meta = `任務日: ${m.dateKey} / パターン: ${m.idx + 1} / ${m.fromCache ? "キャッシュ" : "最新取得"}`;
-      appendBubble("bot", m.text, meta);
+      const { dateKey, idx, text } = await fetchMission();
+      answerEl.style.display = "block";
+      metaEl.style.display = "block";
+      answerEl.textContent = text;
+      metaEl.textContent = `任務日: ${dateKey} / パターン: ${idx+1}（JST 11:00切替）`;
+      btn.textContent = "もう一度見る";
     } catch (err) {
-      appendBubble("bot", "読み込みに失敗しました。", String(err));
+      answerEl.style.display = "block";
+      metaEl.style.display = "block";
+      answerEl.textContent = "読み込みに失敗しました（公開URL/公開設定を確認）";
+      metaEl.textContent = String(err);
+      btn.textContent = "再試行";
     } finally {
-      sendBtn.disabled = false;
-      quickBtn.disabled = false;
-      setStatus();
+      btn.disabled = false;
     }
-  }
-
-  // ===== イベント =====
-  sendBtn.addEventListener("click", () => handleSend(input.value));
-  quickBtn.addEventListener("click", () => handleSend("今日の任務は？"));
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") handleSend(input.value);
   });
-  clearBtn.addEventListener("click", () => {
-    clearCache();
-    appendBubble("bot", "キャッシュを削除しました。次回は最新の任務を取り直します。");
-    setStatus();
-  });
-
-  // ===== 初期表示 =====
-  appendBubble("bot", "ここは任務端末です。『今日の任務は？』を送信してください。");
-  setStatus();
-  setInterval(setStatus, 1000);
-
-  // 任務日が切り替わったらキャッシュを無効化（自動で次回取り直し）
-  let lastKey = missionDateKey();
-  setInterval(() => {
-    const k = missionDateKey();
-    if (k !== lastKey) {
-      lastKey = k;
-      clearCache();
-      appendBubble("bot", "任務が更新されました（JST 11:00）。もう一度聞いてください。");
-    }
-  }, 30 * 1000);
 </script>
 </body>
 </html>
