@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>今日の極秘任務</title>
+  <title>今日の極秘任務（★つき）/ Today's Secret Mobile Squad(UR★)</title>
   <style>
     body { font-family: system-ui,-apple-system,BlinkMacSystemFont; padding:24px; text-align:center; }
     .q { font-size:1.1rem; opacity:.85; margin-bottom:14px; }
@@ -14,15 +14,62 @@
     .btn:disabled { opacity:.6; cursor:default; }
     .a { margin-top:18px; font-size:1.6rem; font-weight:700; line-height:1.4; white-space:pre-wrap; }
     .meta { margin-top:14px; font-size:.9rem; opacity:.6; }
+
+    .notice {
+      margin-top: 16px;
+      font-size: 0.9rem;
+      opacity: 0.85;
+      text-align: left;
+      display: inline-block;
+    }
+
+    .notice summary {
+      cursor: pointer;
+      font-weight: 600;
+      list-style: none;
+    }
+
+    .notice summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .notice summary::before {
+      content: "▶ ";
+      font-size: 0.85em;
+    }
+
+    .notice[open] summary::before {
+      content: "▼ ";
+    }
+
+    .notice ul {
+      margin: 8px 0 0 1.2em;
+      padding: 0;
+    }
+
+    .notice li {
+      margin-bottom: 6px;
+    }
+
   </style>
 </head>
 <body>
-  <div class="q">ボタンを押すと、今日のUR★極秘任務のサーバーを表示します。</div>
+  <div class="q">ボタンを押すと、今日のUR星つき極秘任務のサーバーを表示します。</div>
 
-  <button class="btn" id="btn">今日のUR★サーバーは？</button>
+  <button class="btn" id="btn">今日のキラキラサーバーは？</button>
 
   <div class="a" id="answer" style="display:none;"></div>
   <div class="meta" id="meta" style="display:none;"></div>
+
+// ▼注意事項（折りたたみHTML）
+  <details class="notice" style="display:none;">
+    <summary>注意事項</summary>
+    <ul>
+      <li>★付き任務は、<strong>火・水・土</strong>に実行されます。</li>
+      <li>本内容は、すべてのケースで検証できているものではありません。</li>
+      <li>ご意見・ご要望は、<strong>813-PCv</strong>までお寄せください。</li>
+    </ul>
+  </details>
 
 <script>
   // ▼ここだけ差し替え（Googleシートを「ウェブに公開」で出たCSV URL）
@@ -111,6 +158,7 @@
       const { dateKey, idx, text } = await fetchMission();
       answerEl.style.display = "block";
       metaEl.style.display = "block";
+      document.querySelector(".notice").style.display = "inline-block";
       answerEl.textContent = text;
       metaEl.textContent = `任務日: ${dateKey} / パターン: ${idx+1}（JST 11:00切替）`;
       btn.textContent = "もう一度見る";
