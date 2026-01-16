@@ -50,17 +50,26 @@
     .notice li {
       margin-bottom: 6px;
     }
-
   </style>
 </head>
 <body>
   <div class="q">ボタンを押すと、今日のUR星つき極秘任務のサーバーを表示します。</div>
 
+  <div style="margin-bottom:12px;">
+    <label>
+      日付を指定：
+      <input type="date" id="datePicker">
+    </label>
+    <button class="btn" id="setDateBtn" style="margin-left:6px;">この日で確認</button>
+    <button class="btn" id="clearDateBtn" style="margin-left:6px;">今日に戻る</button>
+  </div>
+
   <button class="btn" id="btn">今日のキラキラサーバーは？</button>
 
   <div class="a" id="answer" style="display:none;"></div>
   <div class="meta" id="meta" style="display:none;"></div>
-  <details class="notice" style="display:none;">
+
+  <details id="notice" class="notice" style="display:none;">
     <summary>注意事項</summary>
     <ul>
       <li>★付き任務は、<strong>火・水・土</strong>に実行されます。</li>
@@ -73,14 +82,29 @@
   // ▼ここだけ差し替え（Googleシートを「ウェブに公開」で出たCSV URL）
   const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQEEIV5e8bKRn52JeHNXySH4aZcce39QM-GY7lD6eh--_tZ5M1JZomfcWeOhzacscWyHEHDC7YC6MFO/pub?output=csv";
 
+  // テスト用：URLで任務日を固定（例：?test=2026-01-16）
   function getTestDateParam() {
-  const p = new URLSearchParams(location.search);
-  const s = p.get("test");
-  if (!s) return null;
-  // 形式: YYYY-MM-DD
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
-  return s;
-}
+    const p = new URLSearchParams(location.search);
+    const s = p.get("test");
+    if (!s) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    return s;
+  }
+
+  function setMainButtonLabel() {
+    const test = getTestDateParam();
+    const btn = document.getElementById("btn");
+    if (!btn) return;
+    btn.textContent = test ? "指定日のキラキラサーバーは？" : "今日のキラキラサーバーは？";
+  }
+
+  // URLの test を v に更新してリロード
+  function goToTestDate(v) {
+    const url = new URL(location.href);
+    url.searchParams.set("test", v);
+    location.href = url.toString();
+  }
+
   // JST（UTC+9固定）
   function nowJST() {
     return new Date(Date.now() + 9 * 60 * 60 * 1000);
@@ -100,18 +124,17 @@
     const yy = base.getUTCFullYear();
     const mm = String(base.getUTCMonth() + 1).padStart(2, "0");
     const dd = String(base.getUTCDate()).padStart(2, "0");
- 
-  // ★ここからが追加部分
+
+    // URLに test=YYYY-MM-DD があればそれを優先
     const test = getTestDateParam();
     if (test) return test;
-  // ★ここまで
-    
+
     return `${yy}-${mm}-${dd}`;
   }
 
   // パターンの基準日調整（ズレたらここを +1 / -1 で合わせる）
   const PATTERN_OFFSET_DAYS = -1;
-  
+
   // 3パターン日替わり
   function dailyIndex3(dateKey) {
     const [y, m, d] = dateKey.split("-").map(Number);
@@ -148,6 +171,7 @@
     const csv = await res.text();
     const rows = parseCSV(csv);
 
+    // 1行目はヘッダー想定（id,text）
     const map = new Map();
     for (let i=1; i<rows.length; i++) {
       const [id, text] = rows[i];
@@ -165,6 +189,10 @@
   const btn = document.getElementById("btn");
   const answerEl = document.getElementById("answer");
   const metaEl = document.getElementById("meta");
+  const noticeEl = document.getElementById("notice");
+
+  // 初期表示でボタン文言を整える
+  setMainButtonLabel();
 
   btn.addEventListener("click", async () => {
     btn.disabled = true;
@@ -174,10 +202,15 @@
       const { dateKey, idx, text } = await fetchMission();
       answerEl.style.display = "block";
       metaEl.style.display = "block";
-      document.querySelector(".notice").style.display = "inline-block";
+      if (noticeEl) noticeEl.style.display = "inline-block";
+
       answerEl.textContent = text;
-      metaEl.textContent = `任務日: ${dateKey} / パターン: ${idx+1}（JST 11:00切替）`;
-      btn.textContent = "もう一度見る";
+
+      const test = getTestDateParam();
+      metaEl.textContent = `任務日: ${dateKey} / パターン: ${idx+1}（JST 11:00切替）${test ? " ※指定日" : ""}`;
+
+      // ここで文言を戻す
+      setMainButtonLabel();
     } catch (err) {
       answerEl.style.display = "block";
       metaEl.style.display = "block";
@@ -188,6 +221,43 @@
       btn.disabled = false;
     }
   });
+
+  // 日付指定 → test=YYYY-MM-DD をURLに付けて再読み込み
+  const datePicker = document.getElementById("datePicker");
+  const setDateBtn = document.getElementById("setDateBtn");
+  const clearDateBtn = document.getElementById("clearDateBtn");
+
+  if (datePicker && setDateBtn) {
+    // ボタンで確認（従来通り）
+    setDateBtn.addEventListener("click", () => {
+      const v = datePicker.value; // YYYY-MM-DD
+      if (!v) {
+        alert("日付を選んでください");
+        return;
+      }
+      goToTestDate(v);
+    });
+
+    // ★追加：日付を選んだ瞬間に自動で切り替え
+    datePicker.addEventListener("change", () => {
+      const v = datePicker.value;
+      if (!v) return;
+      goToTestDate(v);
+    });
+
+    // URLに test= が付いていたら、ピッカーにも反映
+    const initialTest = getTestDateParam();
+    if (initialTest) datePicker.value = initialTest;
+  }
+
+  // 今日に戻る（test パラメータを外す）
+  if (clearDateBtn) {
+    clearDateBtn.addEventListener("click", () => {
+      const url = new URL(location.href);
+      url.searchParams.delete("test");
+      location.href = url.toString();
+    });
+  }
 </script>
 </body>
 </html>
