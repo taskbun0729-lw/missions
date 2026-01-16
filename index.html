@@ -109,11 +109,15 @@
     return `${yy}-${mm}-${dd}`;
   }
 
+  // パターンの基準日調整（ズレたらここを +1 / -1 で合わせる）
+  const PATTERN_OFFSET_DAYS = -1;
+  
   // 3パターン日替わり
   function dailyIndex3(dateKey) {
     const [y, m, d] = dateKey.split("-").map(Number);
     const dayNumber = Date.UTC(y, m - 1, d) / 86400000;
-    return ((dayNumber % 3) + 3) % 3;
+    const adjusted = dayNumber + PATTERN_OFFSET_DAYS;
+    return ((adjusted % 3) + 3) % 3; // 0..2
   }
 
   function parseCSV(text) {
