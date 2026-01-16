@@ -73,6 +73,14 @@
   // ▼ここだけ差し替え（Googleシートを「ウェブに公開」で出たCSV URL）
   const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQEEIV5e8bKRn52JeHNXySH4aZcce39QM-GY7lD6eh--_tZ5M1JZomfcWeOhzacscWyHEHDC7YC6MFO/pub?output=csv";
 
+  function getTestDateParam() {
+  const p = new URLSearchParams(location.search);
+  const s = p.get("test");
+  if (!s) return null;
+  // 形式: YYYY-MM-DD
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  return s;
+}
   // JST（UTC+9固定）
   function nowJST() {
     return new Date(Date.now() + 9 * 60 * 60 * 1000);
@@ -92,6 +100,12 @@
     const yy = base.getUTCFullYear();
     const mm = String(base.getUTCMonth() + 1).padStart(2, "0");
     const dd = String(base.getUTCDate()).padStart(2, "0");
+ 
+  // ★ここからが追加部分
+    const test = getTestDateParam();
+    if (test) return test;
+  // ★ここまで
+    
     return `${yy}-${mm}-${dd}`;
   }
 
